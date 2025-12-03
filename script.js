@@ -21,7 +21,6 @@ request.onerror = function (event) {
     console.error("Database error: " + event.target.errorCode);
 }
 
-
 function addTask(status) {
 
     const transaction = db.transaction(STORE_NAME, "readwrite");
@@ -31,9 +30,11 @@ function addTask(status) {
         task: taskInput,
         status: status
     };
-
+    if (taskObject.task == "") {
+        alert("Please Add Valid Description");
+        return false
+    }
     let addRequest = store.add(taskObject);
-
     addRequest.onsuccess = function (event) {
         const newId = event.target.result
 
@@ -47,7 +48,6 @@ function addTask(status) {
         LoadData();
 
     };
-
     addRequest.onerror = (event) => {
         console.error('Error adding item:', event.target.error);
     };
@@ -69,8 +69,7 @@ function LoadData() {
 }
 
 function renderBoard(tasks) {
-    const containers = document.querySelector('.task-container');
-    containers.innerHTML = "";
+    document.querySelectorAll(".task-container").forEach((column) => (column.innerHTML = ""));
 
     tasks.forEach(task => {
 
@@ -85,7 +84,8 @@ function renderBoard(tasks) {
             <button class="update-task-btn" data-id="${task.id}" onclick="enableEdit(${task.id})")">Update</button>
             <button class="delete-task-btn" data-id="${task.id}" onclick="deleteTask(${task.id})">Delete</button>
         `;
-        containers.appendChild(taskDiv);
+        const column = document.querySelector(`.column[data-status="${task.status}"] .task-container`);
+        column.appendChild(taskDiv);
 
         taskDiv.addEventListener('dragstart', (e) => {
             taskDiv.classList.add('is-dragging')
@@ -120,7 +120,6 @@ function deleteTask(id) {
         LoadData();
 
     }
-
     DeletedData.onerror = (event) => {
         console.error('Error adding item:', event.target.error);
     };
@@ -159,6 +158,33 @@ function saveTask(id) {
 }
 
 
+function UpdateTaskStatus(id, newStatus) {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const getStatus = store.get(id)
+    console.log(getStatus);
+
+
+    getStatus.onsuccess = () => {
+        const task = getStatus.result;
+        if (task) {
+            const oldStatus = task.status
+            if (oldStatus !== newStatus) {
+                undoStack.push({
+                    type: 'move',
+                    id,
+                    from: oldStatus,
+                    to: newStatus
+                })
+            }
+            task.status = newStatus
+            store.put(task).onsuccess = () => {
+                LoadData()
+            }
+        }
+    }
+}
+
 const dragColumns = document.querySelectorAll('.column')
 dragColumns.forEach((dragColumn) => {
     dragColumn.addEventListener('dragover', (e) => {
@@ -168,8 +194,11 @@ dragColumns.forEach((dragColumn) => {
     dragColumn.addEventListener('drop', (e) => {
         e.preventDefault();
         const taskId = e.dataTransfer.getData("text/plain");
-        const task = document.getElementById(taskId)
-        dragColumn.appendChild(task);
+        const newStatus = dragColumn.getAttribute("data-status");
+        console.log(newStatus);
+
+        const id = Number(taskId.replace("task-", ""))
+        UpdateTaskStatus(id, newStatus)
     })
 })
 
@@ -190,6 +219,10 @@ function undoAction() {
             undoDelete(action)
             break;
 
+        case "move":
+            undoMove(action)
+            break;
+
         default:
             console.log("unknow Action", action);
 
@@ -208,4 +241,23 @@ function undoDelete(action) {
     store.put(action.data).onsuccess = () => {
         LoadData()
     }
+}
+
+function undoMove(action) {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+
+    const getStatusData = store.get(action.id)
+
+    getStatusData.onsuccess = () => {
+        const task = getStatusData.result
+
+        if (task) {
+            task.status = action.from
+            store.put(task).onsuccess = () => {
+                LoadData()
+            }
+        }
+    }
+
 }
