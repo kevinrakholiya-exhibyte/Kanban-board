@@ -97,6 +97,7 @@ body {
     cursor: pointer;
     transition: background-color 0.3s;
 }
+
 .delete-task-btn {
     background-color: #d10b0b;
     border: none;
@@ -128,9 +129,9 @@ body {
     background-color: #c8e6c9;
 }
 
-.task-item{
-     display: flex;
-    justify-content: space-between; 
+.task-item {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
     padding: 8px 10px;
     background: #f0f0f0;
@@ -143,5 +144,20 @@ body {
     display: flex;
     justify-content: space-around;
     margin-bottom: 3px;
+}
+
+.undo-div {
+    padding-left: 40px;
+}
+
+.undo-btn {
+    background-color: #0f4aed;
+    border: 1px solid #ccc;
+    color: white;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 4px;
+    margin: 10px;
 }
 
