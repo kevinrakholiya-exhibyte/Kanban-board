@@ -1,8 +1,8 @@
-const request = indexedDB.open("todo_Database", 2)
-const STORE_NAME = "todo_store"
+const request = indexedDB.open("Kanban_Database", 2)
+const STORE_NAME = "Kanban_Store"
 let db;
 let undoStack = [];
-
+let isUndo = false  
 
 request.onupgradeneeded = (event) => {
     db = event.target.result
@@ -11,66 +11,27 @@ request.onupgradeneeded = (event) => {
         objectStore.createIndex('status', 'status', { unique: false });
     }
 };
-
 request.onsuccess = function (event) {
     db = event.target.result;
-    LoadData();
-
+    LoadTask();
 }
 request.onerror = function (event) {
     console.error("Database error: " + event.target.errorCode);
 }
-
-function addTask(status) {
-
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const taskInput = document.getElementById('taskInput').value;
-    const taskObject = {
-        task: taskInput,
-        status: status
-    };
-    if (taskObject.task == "") {
-        alert("Please Add Valid Description");
-        return false
-    }
-    let addRequest = store.add(taskObject);
-    addRequest.onsuccess = function (event) {
-        const newId = event.target.result
-
-        console.log("Data added sucessfully");
-        undoStack.push({
-            type: "create",
-            id: newId
-        })
-        document.getElementById('taskInput').value = ""
-
-        LoadData();
-
-    };
-    addRequest.onerror = (event) => {
-        console.error('Error adding item:', event.target.error);
-    };
-
-}
-
-
-function LoadData() {
+//Load All Tasks From Storage And Render Them On The Board
+function LoadTask() {
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     const request = store.getAll();
-
     request.onsuccess = (event) => {
         const task = event.target.result;
-        console.log(task);
-        console.log("Data Loaded sucessfully");
-        renderBoard(task)
+        RenderTasks(task);
+        UpdateTaskCount(task);
     }
 }
-
-function renderBoard(tasks) {
+//Render The Provided List Of Tasks
+function RenderTasks(tasks) {
     document.querySelectorAll(".task-container").forEach((column) => (column.innerHTML = ""));
-
     tasks.forEach(task => {
 
         const taskDiv = document.createElement('div');
@@ -78,11 +39,10 @@ function renderBoard(tasks) {
         taskDiv.setAttribute('draggable', 'true');
         taskDiv.id = `task-${task.id}`;
 
-
         taskDiv.innerHTML = `
             <span class="task-text">${task.task}</span>
-            <button class="update-task-btn" data-id="${task.id}" onclick="enableEdit(${task.id})")">Update</button>
-            <button class="delete-task-btn" data-id="${task.id}" onclick="deleteTask(${task.id})">Delete</button>
+            <button class="update-task-btn" data-id="${task.id}" onclick="EnableEditOn(${task.id})")">Update</button>
+            <button class="delete-task-btn" data-id="${task.id}" onclick="DeleteTask(${task.id})">Delete</button>
         `;
         const column = document.querySelector(`.column[data-status="${task.status}"] .task-container`);
         column.appendChild(taskDiv);
@@ -90,7 +50,6 @@ function renderBoard(tasks) {
         taskDiv.addEventListener('dragstart', (e) => {
             taskDiv.classList.add('is-dragging')
             e.dataTransfer.setData("text/plain", taskDiv.id);
-
         })
 
         taskDiv.addEventListener('dragend', (e) => {
@@ -98,164 +57,77 @@ function renderBoard(tasks) {
         })
     });
 }
-
-
-function deleteTask(id) {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-
-    const DeletedData = store.get(id);
-    console.log(DeletedData);
-
-    DeletedData.onsuccess = () => {
-        const deletedItem = DeletedData.result
-
-        undoStack.push({
-            type: "delete",
-            data: deletedItem
-        })
-        store.delete(id)
-        console.log("Data Deleted sucessfully");
-
-        LoadData();
-
-    }
-    DeletedData.onerror = (event) => {
-        console.error('Error adding item:', event.target.error);
-    };
-}
-
-function UpdateTask(id, tasks) {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const getData = store.get(id)
-
-    getData.onsuccess = (event) => {
-        const todoItem = event.target.result
-        console.log(todoItem);
-
-        if (todoItem) {
-            todoItem.task = tasks
-            store.put(todoItem)
-        }
-    }
-}
-
-function enableEdit(id) {
-    const taskItem = document.querySelector(`[data-id='${id}']`).parentNode
-    const taskText = taskItem.querySelector('.task-text')
-    taskText.contentEditable = true
-    const UpdateBtn = taskItem.querySelector(".update-task-btn")
-    UpdateBtn.textContent = 'save'
-    UpdateBtn.setAttribute('onclick', `saveTask (${id})`)
-}
-
-function saveTask(id) {
-    const taskItem = document.querySelector(`[data-id='${id}']`).parentNode
-    const taskText = taskItem.querySelector('.task-text').innerText
-    UpdateTask(id, taskText)
-    LoadData();
-}
-
-
-function UpdateTaskStatus(id, newStatus) {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const getStatus = store.get(id)
-    console.log(getStatus);
-
-
-    getStatus.onsuccess = () => {
-        const task = getStatus.result;
-        if (task) {
-            const oldStatus = task.status
-            if (oldStatus !== newStatus) {
-                undoStack.push({
-                    type: 'move',
-                    id,
-                    from: oldStatus,
-                    to: newStatus
-                })
-            }
-            task.status = newStatus
-            store.put(task).onsuccess = () => {
-                LoadData()
-            }
-        }
-    }
-}
-
-const dragColumns = document.querySelectorAll('.column')
-dragColumns.forEach((dragColumn) => {
+//Handle Drag And Drop For All Task Columns
+const DragColumns = document.querySelectorAll('.column')
+DragColumns.forEach((dragColumn) => {
     dragColumn.addEventListener('dragover', (e) => {
         e.preventDefault()
     })
-
     dragColumn.addEventListener('drop', (e) => {
         e.preventDefault();
         const taskId = e.dataTransfer.getData("text/plain");
-        const newStatus = dragColumn.getAttribute("data-status");
-        console.log(newStatus);
-
+        const NewStatus = dragColumn.getAttribute("data-status");
         const id = Number(taskId.replace("task-", ""))
-        UpdateTaskStatus(id, newStatus)
+        UpdateTaskStatus(id, NewStatus)
     })
 })
-
-function undoAction() {
+//Perform An Undo Operation By The Action Type
+function UndoAction() {
     if (undoStack.length === 0) {
         alert("Nothing to Undo")
-        console.log("nothing to undo");
         return
     }
+    const ConfirmUndo = confirm("Are You Sure Want to Undo Last Action ?");
+    if (!ConfirmUndo) return;
     const action = undoStack.pop()
-
     switch (action.type) {
         case "create":
-            undoCreate(action)
+            UndoCreate(action)
             break;
 
         case "delete":
-            undoDelete(action)
+            UndoDelete(action)
             break;
 
         case "move":
-            undoMove(action)
+            UndoMove(action)
             break;
 
         default:
             console.log("unknow Action", action);
-
     }
-
 }
-
-function undoCreate(action) {
-    deleteTask(action.id)
-}
-
-function undoDelete(action) {
+//Undo Creation Of a Task (Remove The Previously Created Task)
+function UndoCreate(action) {
+    isUndo = true
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
 
+    store.delete(action.id).onsuccess = () => {
+        LoadTask()
+        isUndo = false
+    }
+}
+//Undo Deletion Of a Task (Restore The Previously Deleted Task)
+function UndoDelete(action) {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
     store.put(action.data).onsuccess = () => {
-        LoadData()
+        LoadTask()
     }
 }
-
-function undoMove(action) {
+//Undo Moving A Task Between Columns (Restore its Old Status)
+function UndoMove(action) {
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
-
     const getStatusData = store.get(action.id)
-
     getStatusData.onsuccess = () => {
         const task = getStatusData.result
 
         if (task) {
             task.status = action.from
             store.put(task).onsuccess = () => {
-                LoadData()
+                LoadTask()
             }
         }
     }

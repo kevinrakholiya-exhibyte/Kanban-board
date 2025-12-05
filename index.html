@@ -13,36 +13,41 @@
         <h1>Kanban Board</h1>
     </div>
 
+    <div class="tasks-in-btn">
+        <input type="text" id="taskInput" class="task-input" placeholder="Enter a task...">
+        <button class="add-task-btn" onclick="AddTask('todo')">Add Task</button>
+    </div>
+
     <div class="board">
 
         <div class="column" id="todo" data-status="todo">
-            <h2>Todo</h2>
+            <h2>Todo <span id="count-todo">0</span> </h2>
             <hr>
-
-            <div class="tasks-in-btn">
-                <input type="text" id="taskInput" class="task-input" placeholder="Enter a task...">
-                <button class="add-task-btn" onclick="addTask('todo')">Add Task</button>
-            </div>
             <div class="task-container"></div>
         </div>
 
         <div class="column" id="in-progress" data-status="in-progress">
-            <h2>In Progress</h2>
+            <h2>In Progress <span id="count-in-progress">0</span></h2>
             <hr>
             <div class="task-container"></div>
         </div>
+
         <div class="column" id="done" data-status="done">
-            <h2>Done</h2>
+            <h2>Done <span id="count-done">0</span></h2>
             <hr>
             <div class="task-container"></div>
         </div>
+
     </div>
+
     <div class="undo-div">
-        <button class="undo-btn" onclick="undoAction()">
+        <button class="undo-btn" onclick="UndoAction()">
             Undo
         </button>
     </div>
+
     <script src="script.js"></script>
+    <script src="operation.js"></script>
 </body>
 
 </html>
